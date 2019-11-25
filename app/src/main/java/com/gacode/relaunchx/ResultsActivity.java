@@ -1425,6 +1425,10 @@ public class ResultsActivity extends Activity {
 		setEinkController();
 		super.onResume();
 		app.generalOnResume(TAG, this);
+		if (prefs.getBoolean("useKOReaderHistFav", false)) {
+			app.reloadKOReaderHistory();
+			app.reloadKOReaderFavorites();
+		}
 	}
 
 	private String getEbookName(String dir, String file) {

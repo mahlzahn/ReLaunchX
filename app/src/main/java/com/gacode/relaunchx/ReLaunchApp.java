@@ -81,14 +81,19 @@ public class ReLaunchApp extends Application {
 	public final String BACKUP_DIR = "/sdcard/.relaunchx";
 	public final String DATA_DIR = "/data/data/com.gacode.relaunchx";
 
-	public HashMap<String, Integer> history = new HashMap<String, Integer>();
-	public HashMap<String, Integer> columns = new HashMap<String, Integer>();
-	private HashMap<String, List<String[]>> m = new HashMap<String, List<String[]>>();
+	public HashMap<String, Integer> history = new HashMap<>();
+	public HashMap<String, Integer> columns = new HashMap<>();
+	private HashMap<String, List<String[]>> m = new HashMap<>();
 	private HashMap<String, Drawable> icons;
 	private List<HashMap<String, String>> readers;
 	private List<String> apps;
 
 	public BooksBase dataBase;
+
+	static public final String KO_HISTORY_FILE = "/sdcard/koreader/history.lua";
+	static public final String KO_COLLECTION_FILE = "/sdcard/koreader/settings/collection.lua";
+	public HashMap<String, Float> progress = new HashMap<>();
+	public HashMap<String, Long> sdrFilesLastModified = new HashMap<>();
 
 	// Icons
 	public HashMap<String, Drawable> getIcons() {
@@ -159,7 +164,15 @@ public class ReLaunchApp extends Application {
 		if (m.containsKey(name))
 			return m.get(name);
 		else
-			return new ArrayList<String[]>();
+			return new ArrayList<>();
+	}
+
+	// remove list by name
+	public List<String[]> removeList(String name) {
+		if (m.containsKey(name))
+			return m.remove(name);
+		else
+			return new ArrayList<>();
 	}
 
 	// set list by name
@@ -385,7 +398,11 @@ public class ReLaunchApp extends Application {
 	public boolean readFile(String listName, String fileName, String delimiter) {
 		FileInputStream fis = null;
 		try {
-			fis = openFileInput(fileName);
+			if (fileName.startsWith("/")) {
+				fis = new FileInputStream(fileName);
+			} else{
+				fis = openFileInput(fileName);
+			}
 		} catch (FileNotFoundException e) {
 		}
 		if (fis == null)
@@ -434,7 +451,11 @@ public class ReLaunchApp extends Application {
 		List<String[]> resultList = m.get(listName);
 		FileOutputStream fos = null;
 		try {
-			fos = openFileOutput(fileName, Context.MODE_PRIVATE);
+			if (fileName.startsWith("/")) {
+				fos = new FileOutputStream(fileName);
+			} else {
+				fos = openFileOutput(fileName, Context.MODE_PRIVATE);
+			}
 		} catch (FileNotFoundException e) {
 			return;
 		}
@@ -807,7 +828,7 @@ public class ReLaunchApp extends Application {
 		if (!tDir.exists())
 			if (!tDir.mkdir())
 				return false;
-		String[] files = {"AppFavorites.txt", "AppLruFile.txt", "Columns.txt", "Filters.txt", "History.txt", "LruFile.txt"};
+		String[] files = {"AppFavorites.txt", "AppLruFile.txt", "Columns.txt", "Favorites.txt", "Filters.txt", "History.txt", "LruFile.txt"};
 		for (String f : files) {
 			String src = fromDir.getAbsolutePath() + "/files/" + f;
 			String dst = toDir.getAbsolutePath() + "/files/" + f;
@@ -846,6 +867,74 @@ public class ReLaunchApp extends Application {
 		String oldStart = prefs.getString("startDir", "/sdcard,/media/My Files");
 		editor.putString("startDir", oldStart + "," + dir);
 		editor.commit();
+	}
+
+	public boolean reloadKOReaderHistory() {
+		//Log.d(TAG, "--- reloadKOReaderHistory()");
+		removeList("koreaderHistory");
+		if (!readFile("koreaderHistory", KO_HISTORY_FILE, "="))
+			return false;
+		//history.clear();
+		//progress.clear();
+		removeList("lastOpened");
+		for (String[] r : getList("koreaderHistory")) {
+			if (r[0].contains("file")) {
+				String filePath = r[1].split("\"")[1];
+				filePath = filePath.replaceFirst("^/mnt/", "/");
+				filePath = filePath.replaceFirst("^/storage/emulated/legacy/", "/sdcard/");
+				filePath = filePath.replaceFirst("^/storage/emulated/0", "/sdcard/");
+				addToList("lastOpened", filePath, true, "/");
+				String filePathWithoutExt = filePath.substring(0, filePath.lastIndexOf("."));
+				String filePathExt = filePath.substring(filePath.lastIndexOf("."));
+				final String sdrFilePath = filePathWithoutExt + ".sdr/metadata" + filePathExt + ".lua";
+				long sdrFileLM = new File(sdrFilePath).lastModified();
+				if (sdrFilesLastModified.containsKey(filePath)
+						&& sdrFilesLastModified.get(filePath) == sdrFileLM)
+					continue;
+				sdrFilesLastModified.put(filePath, sdrFileLM);
+				String sdrListName = "kohist_" + filePath;
+				removeList(sdrListName);
+				boolean fileFinished = false;
+				float fileProgress = 0;
+				if (readFile(sdrListName, sdrFilePath, "=")) {
+					for (String[] r2 : getList(sdrListName)) {
+						if (r2[0].contains("[\"status\"]") && r2[1].contains("\"complete\""))
+							fileFinished = true;
+						else if (r2[0].contains("[\"percent_finished\"]"))
+							fileProgress = Float.parseFloat(r2[1].split(",")[0]);
+					}
+				}
+				if (fileFinished) {
+					history.put(filePath, FINISHED);
+					Log.d("reloadKOReaderHistory", "File " + filePath + " added to FINISHED.");
+				} else{
+					history.put(filePath, READING);
+					Log.d("reloadKOReaderHistory", "File " + filePath + " added to READING.");
+				}
+				progress.put(filePath, fileProgress);
+				Log.d("reloadKOReaderHistory",
+						"File " + filePath + " to " + (int)(fileProgress * 100) + "% finished.");
+			}
+		}
+		return true;
+	}
+
+	public boolean reloadKOReaderFavorites() {
+		//Log.d(TAG, "--- reloadKOReaderFavorites()");
+		removeList("koreaderFavorites");
+		if (!readFile("koreaderFavorites", KO_COLLECTION_FILE, "="))
+			return false;
+		removeList("favorites");
+		for (String[] r : getList("koreaderFavorites")) {
+			if (r[0].contains("file")) {
+				String filePath = r[1].split("\"")[1];
+				filePath = filePath.replaceFirst("^/mnt/", "/");
+				filePath = filePath.replaceFirst("^/storage/emulated/legacy/", "/sdcard/");
+				filePath = filePath.replaceFirst("^/storage/emulated/0", "/sdcard/");
+				addToList("favorites", filePath, true);
+			}
+		}
+		return true;
 	}
 
 	@Override

@@ -359,6 +359,9 @@
 	</string>
 	<string name="pref_i_createIntent_off">Do not show \'Create intent...\' context menu item
 	</string>
+	<string name="pref_i_useKOReaderHistFav_title">History and favorites from KOReader</string>
+	<string name="pref_i_useKOReaderHistFav_on">Use KOReader history and favorites</string>
+	<string name="pref_i_useKOReaderHistFav_off">Use ReLaunchX internal history and favorites</string>
 	<string name="pref_i_screenOrientation_title">Screen Orientation</string>
 	<string name="pref_i_einkUpdateMode_title">EInk Screen Update Mode</string>
 	<string name="pref_i_einkUpdateInterval_title">EInk Screen Full Update Interval</string>

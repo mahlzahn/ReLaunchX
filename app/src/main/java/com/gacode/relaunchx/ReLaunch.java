@@ -83,15 +83,14 @@ import android.widget.Toast;
 
 import static com.gacode.relaunchx.FileSystem.bytesToString;
 
-
 public class ReLaunch extends Activity {
 
 	final static String TAG = "ReLaunchX";
 	static public final String APP_LRU_FILE = "AppLruFile.txt";
 	static public final String APP_FAV_FILE = "AppFavorites.txt";
-	static public final String LRU_FILE = "LruFile.txt";
-	static public final String FAV_FILE = "Favorites.txt";
-	static public final String HIST_FILE = "History.txt";
+	static public final String LRU_FILE = "/sdcard/LruFile.txt";
+	static public final String FAV_FILE = "/sdcard/Favorites.txt";
+	static public final String HIST_FILE = "/sdcard/History.txt";
 	static public final String FILT_FILE = "Filters.txt";
 	static public final String COLS_FILE = "Columns.txt";
 	final String defReaders = ".fb2,.fb2.zip:org.coolreader%org.coolreader.CoolReader%Cool Reader"
@@ -1954,22 +1953,28 @@ public class ReLaunch extends Activity {
 		app.setReaders(parseReadersString(typesString));
 
 		// Miscellaneous lists list
-		app.readFile("lastOpened", LRU_FILE);
-		app.readFile("favorites", FAV_FILE);
+		app.history.clear();
+		app.progress.clear();
+		if (prefs.getBoolean("useKOReaderHistFav", false)) {
+			app.reloadKOReaderHistory();
+			app.reloadKOReaderFavorites();
+		} else {
+			app.readFile("lastOpened", LRU_FILE);
+			app.readFile("history", HIST_FILE, ":");
+			for (String[] r : app.getList("history")) {
+				if (r[1].equals("READING"))
+					app.history.put(r[0], app.READING);
+				else if (r[1].equals("FINISHED"))
+					app.history.put(r[0], app.FINISHED);
+			}
+			app.readFile("favorites", FAV_FILE);
+		}
 		app.readFile("filters", FILT_FILE, ":");
 		app.filters_and = prefs.getBoolean("filtersAnd", true);
 		app.readFile("columns", COLS_FILE, ":");
 		app.columns.clear();
 		for (String[] r : app.getList("columns")) {
 			app.columns.put(r[0], Integer.parseInt(r[1]));
-		}
-		app.readFile("history", HIST_FILE, ":");
-		app.history.clear();
-		for (String[] r : app.getList("history")) {
-			if (r[1].equals("READING"))
-				app.history.put(r[0], app.READING);
-			else if (r[1].equals("FINISHED"))
-				app.history.put(r[0], app.FINISHED);
 		}
 		setSortMode(prefs.getInt("sortKey", 0), prefs.getInt("sortOrder", 0));
 		if (useDirViewer) {
@@ -3455,6 +3460,10 @@ public class ReLaunch extends Activity {
 		if (app.dataBase == null)
 			app.dataBase = new BooksBase(this);
 		app.generalOnResume(TAG, this);
+		if (prefs.getBoolean("useKOReaderHistFav", false)) {
+			app.reloadKOReaderHistory();
+			app.reloadKOReaderFavorites();
+		}
 		refreshBottomInfo();
 		redrawList();
 
