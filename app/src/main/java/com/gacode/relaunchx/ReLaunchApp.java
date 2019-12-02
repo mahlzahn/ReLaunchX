@@ -807,7 +807,7 @@ public class ReLaunchApp extends Application {
 		if (!tDir.exists())
 			if (!tDir.mkdir())
 				return false;
-		String[] files = {"AppFavorites.txt", "AppLruFile.txt", "Columns.txt", "Filters.txt", "History.txt", "LruFile.txt"};
+		String[] files = {"AppFavorites.txt", "AppLruFile.txt", "Columns.txt", "Favorites.txt", "Filters.txt", "History.txt", "LruFile.txt"};
 		for (String f : files) {
 			String src = fromDir.getAbsolutePath() + "/files/" + f;
 			String dst = toDir.getAbsolutePath() + "/files/" + f;
