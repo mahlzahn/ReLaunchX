@@ -1,3 +1,6 @@
 [submodule "libs/ebookparser"]
 	path = libs/ebookparser
 	url = https://github.com/Leszek111/ebookparser.git
+[submodule "libs/koreaderhistfavparser"]
+	path = libs/koreaderhistfavparser
+	url = https://github.com/mahlzahn/koreaderhistfavparser
