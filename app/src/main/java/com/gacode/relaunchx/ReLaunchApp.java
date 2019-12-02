@@ -158,14 +158,6 @@ public class ReLaunchApp extends Application {
 			return new ArrayList<>();
 	}
 
-	// remove list by name
-	public List<String[]> removeList(String name) {
-		if (m.containsKey(name))
-			return m.remove(name);
-		else
-			return new ArrayList<>();
-	}
-
 	// set list by name
 	public void setList(String name, List<String[]> l) {
 		m.put(name, l);
@@ -299,11 +291,8 @@ public class ReLaunchApp extends Application {
 			}
 		} else {
 			int ind = fullName.indexOf(delimiter);
-			if (ind < 0) {
-				if (delimiter.equals("=") && fullName.contains("}"))
-					addToList_internal(listName, fullName, "", addToEnd);
+			if (ind < 0)
 				return;
-			}
 			if (ind + delimiter.length() >= fullName.length())
 				return;
 			String dname = fullName.substring(0, ind);
@@ -330,10 +319,6 @@ public class ReLaunchApp extends Application {
 		List<String[]> resultList = m.get(listName);
 
 		String[] entry = new String[] { dr, fn };
-		if (dr.contains("}") && fn.equals("")) {
-			resultList.add(entry);
-			return;
-		}
 		for (int i = 0; i < resultList.size(); i++) {
 			if (resultList.get(i)[0].equals(dr)
 					&& resultList.get(i)[1].equals(fn)) {
@@ -396,11 +381,7 @@ public class ReLaunchApp extends Application {
 	public boolean readFile(String listName, String fileName, String delimiter) {
 		FileInputStream fis = null;
 		try {
-			if (fileName.startsWith("/")) {
-				fis = new FileInputStream(fileName);
-			} else{
-				fis = openFileInput(fileName);
-			}
+			fis = openFileInput(fileName);
 		} catch (FileNotFoundException e) {
 		}
 		if (fis == null)
@@ -449,31 +430,19 @@ public class ReLaunchApp extends Application {
 		List<String[]> resultList = m.get(listName);
 		FileOutputStream fos = null;
 		try {
-			if (fileName.startsWith("/")) {
-				fos = new FileOutputStream(fileName);
-			} else {
-				fos = openFileOutput(fileName, Context.MODE_PRIVATE);
-			}
+			fos = openFileOutput(fileName, Context.MODE_PRIVATE);
 		} catch (FileNotFoundException e) {
 			return;
-		}
-		if (fileName.endsWith(".lua")) {
-			String line = "return {\n";
-			try {
-				fos.write(line.getBytes());
-			} catch (IOException e) {}
 		}
 		for (int i = 0; i < resultList.size(); i++) {
 			if (maxEntries != 0 && i >= maxEntries)
 				break;
-			String line;
-			if (fileName.endsWith(".lua") && delimiter.equals("=") && resultList.get(i)[0].contains("}"))
-				line = resultList.get(i)[0] + "\n";
-			else
-				line = resultList.get(i)[0] + delimiter + resultList.get(i)[1] + "\n";
+			String line = resultList.get(i)[0] + delimiter
+					+ resultList.get(i)[1] + "\n";
 			try {
 				fos.write(line.getBytes());
-			} catch (IOException e) {}
+			} catch (IOException e) {
+			}
 		}
 		try {
 			fos.close();
@@ -834,7 +803,7 @@ public class ReLaunchApp extends Application {
 		if (!tDir.exists())
 			if (!tDir.mkdir())
 				return false;
-		String[] files = {"AppFavorites.txt", "AppLruFile.txt", "Columns.txt", "Favorites.txt", "Filters.txt", "History.txt", "LruFile.txt"};
+		String[] files = {"AppFavorites.txt", "AppLruFile.txt", "Columns.txt", "Filters.txt", "History.txt", "LruFile.txt"};
 		for (String f : files) {
 			String src = fromDir.getAbsolutePath() + "/files/" + f;
 			String dst = toDir.getAbsolutePath() + "/files/" + f;
