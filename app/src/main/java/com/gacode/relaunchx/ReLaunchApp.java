@@ -10,10 +10,8 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -27,12 +25,8 @@ import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
-import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import android.util.Log;
-import android.view.View;
-import android.view.ViewConfiguration;
-import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -58,8 +52,8 @@ public class ReLaunchApp extends Application {
 	final String DIR_TAG = ".DIR..";
 
 	// Book status
-	final int READING = 1;
-	final int FINISHED = 2;
+	static final int READING = 1;
+	static final int FINISHED = 2;
 
 	// Max file sizes
 	int viewerMax;
@@ -90,10 +84,7 @@ public class ReLaunchApp extends Application {
 
 	public BooksBase dataBase;
 
-	static public final String KO_HISTORY_FILE = "/sdcard/koreader/history.lua";
-	static public final String KO_COLLECTION_FILE = "/sdcard/koreader/settings/collection.lua";
-	public HashMap<String, Float> progress = new HashMap<>();
-	public HashMap<String, Long> sdrFilesLastModified = new HashMap<>();
+	public KOReaderHistFavRelaunch koreaderHistFav;
 
 	// Icons
 	public HashMap<String, Drawable> getIcons() {
@@ -308,8 +299,11 @@ public class ReLaunchApp extends Application {
 			}
 		} else {
 			int ind = fullName.indexOf(delimiter);
-			if (ind < 0)
+			if (ind < 0) {
+				if (delimiter.equals("=") && fullName.contains("}"))
+					addToList_internal(listName, fullName, "", addToEnd);
 				return;
+			}
 			if (ind + delimiter.length() >= fullName.length())
 				return;
 			String dname = fullName.substring(0, ind);
@@ -336,6 +330,10 @@ public class ReLaunchApp extends Application {
 		List<String[]> resultList = m.get(listName);
 
 		String[] entry = new String[] { dr, fn };
+		if (dr.contains("}") && fn.equals("")) {
+			resultList.add(entry);
+			return;
+		}
 		for (int i = 0; i < resultList.size(); i++) {
 			if (resultList.get(i)[0].equals(dr)
 					&& resultList.get(i)[1].equals(fn)) {
@@ -459,15 +457,23 @@ public class ReLaunchApp extends Application {
 		} catch (FileNotFoundException e) {
 			return;
 		}
+		if (fileName.endsWith(".lua")) {
+			String line = "return {\n";
+			try {
+				fos.write(line.getBytes());
+			} catch (IOException e) {}
+		}
 		for (int i = 0; i < resultList.size(); i++) {
 			if (maxEntries != 0 && i >= maxEntries)
 				break;
-			String line = resultList.get(i)[0] + delimiter
-					+ resultList.get(i)[1] + "\n";
+			String line;
+			if (fileName.endsWith(".lua") && delimiter.equals("=") && resultList.get(i)[0].contains("}"))
+				line = resultList.get(i)[0] + "\n";
+			else
+				line = resultList.get(i)[0] + delimiter + resultList.get(i)[1] + "\n";
 			try {
 				fos.write(line.getBytes());
-			} catch (IOException e) {
-			}
+			} catch (IOException e) {}
 		}
 		try {
 			fos.close();
@@ -869,72 +875,17 @@ public class ReLaunchApp extends Application {
 		editor.commit();
 	}
 
-	public boolean reloadKOReaderHistory() {
-		//Log.d(TAG, "--- reloadKOReaderHistory()");
-		removeList("koreaderHistory");
-		if (!readFile("koreaderHistory", KO_HISTORY_FILE, "="))
-			return false;
-		//history.clear();
-		//progress.clear();
-		removeList("lastOpened");
-		for (String[] r : getList("koreaderHistory")) {
-			if (r[0].contains("file")) {
-				String filePath = r[1].split("\"")[1];
-				filePath = filePath.replaceFirst("^/mnt/", "/");
-				filePath = filePath.replaceFirst("^/storage/emulated/legacy/", "/sdcard/");
-				filePath = filePath.replaceFirst("^/storage/emulated/0", "/sdcard/");
-				addToList("lastOpened", filePath, true, "/");
-				String filePathWithoutExt = filePath.substring(0, filePath.lastIndexOf("."));
-				String filePathExt = filePath.substring(filePath.lastIndexOf("."));
-				final String sdrFilePath = filePathWithoutExt + ".sdr/metadata" + filePathExt + ".lua";
-				long sdrFileLM = new File(sdrFilePath).lastModified();
-				if (sdrFilesLastModified.containsKey(filePath)
-						&& sdrFilesLastModified.get(filePath) == sdrFileLM)
-					continue;
-				sdrFilesLastModified.put(filePath, sdrFileLM);
-				String sdrListName = "kohist_" + filePath;
-				removeList(sdrListName);
-				boolean fileFinished = false;
-				float fileProgress = 0;
-				if (readFile(sdrListName, sdrFilePath, "=")) {
-					for (String[] r2 : getList(sdrListName)) {
-						if (r2[0].contains("[\"status\"]") && r2[1].contains("\"complete\""))
-							fileFinished = true;
-						else if (r2[0].contains("[\"percent_finished\"]"))
-							fileProgress = Float.parseFloat(r2[1].split(",")[0]);
-					}
-				}
-				if (fileFinished) {
-					history.put(filePath, FINISHED);
-					Log.d("reloadKOReaderHistory", "File " + filePath + " added to FINISHED.");
-				} else{
-					history.put(filePath, READING);
-					Log.d("reloadKOReaderHistory", "File " + filePath + " added to READING.");
-				}
-				progress.put(filePath, fileProgress);
-				Log.d("reloadKOReaderHistory",
-						"File " + filePath + " to " + (int)(fileProgress * 100) + "% finished.");
-			}
-		}
-		return true;
+	public void readKoreaderFavorites() {
+		setList("favorites", koreaderHistFav.getFavoritesList());
+		saveList("favorites");
 	}
 
-	public boolean reloadKOReaderFavorites() {
-		//Log.d(TAG, "--- reloadKOReaderFavorites()");
-		removeList("koreaderFavorites");
-		if (!readFile("koreaderFavorites", KO_COLLECTION_FILE, "="))
-			return false;
-		removeList("favorites");
-		for (String[] r : getList("koreaderFavorites")) {
-			if (r[0].contains("file")) {
-				String filePath = r[1].split("\"")[1];
-				filePath = filePath.replaceFirst("^/mnt/", "/");
-				filePath = filePath.replaceFirst("^/storage/emulated/legacy/", "/sdcard/");
-				filePath = filePath.replaceFirst("^/storage/emulated/0", "/sdcard/");
-				addToList("favorites", filePath, true);
-			}
-		}
-		return true;
+	public void readKoreaderHistory() {
+		history = koreaderHistFav.getHistoryMap();
+		setList("lastOpened", koreaderHistFav.getLastOpenedList());
+		setList("history", koreaderHistFav.getHistoryList());
+		saveList("history");
+		saveList("lastOpened");
 	}
 
 	@Override

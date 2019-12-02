@@ -2,6 +2,7 @@ package com.gacode.relaunchx;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -88,9 +89,9 @@ public class ReLaunch extends Activity {
 	final static String TAG = "ReLaunchX";
 	static public final String APP_LRU_FILE = "AppLruFile.txt";
 	static public final String APP_FAV_FILE = "AppFavorites.txt";
-	static public final String LRU_FILE = "/sdcard/LruFile.txt";
-	static public final String FAV_FILE = "/sdcard/Favorites.txt";
-	static public final String HIST_FILE = "/sdcard/History.txt";
+	static public final String LRU_FILE = "LruFile.txt";
+	static public final String FAV_FILE = "Favorites.txt";
+	static public final String HIST_FILE = "History.txt";
 	static public final String FILT_FILE = "Filters.txt";
 	static public final String COLS_FILE = "Columns.txt";
 	final String defReaders = ".fb2,.fb2.zip:org.coolreader%org.coolreader.CoolReader%Cool Reader"
@@ -1954,10 +1955,16 @@ public class ReLaunch extends Activity {
 
 		// Miscellaneous lists list
 		app.history.clear();
-		app.progress.clear();
 		if (prefs.getBoolean("useKOReaderHistFav", false)) {
-			app.reloadKOReaderHistory();
-			app.reloadKOReaderFavorites();
+			try {
+				app.koreaderHistFav = new KOReaderHistFavRelaunch();
+				app.readKoreaderHistory();
+				app.readKoreaderFavorites();
+			} catch (FileNotFoundException e) {
+				Log.d(TAG, "No directory for KOReader history and favorites found." +
+						" Use ReLaunchX internal history and favorites.");
+				e.printStackTrace();
+			}
 		} else {
 			app.readFile("lastOpened", LRU_FILE);
 			app.readFile("history", HIST_FILE, ":");
@@ -2830,24 +2837,50 @@ public class ReLaunch extends Activity {
 			app.addStartDir(fullName);
 			break;
 		case CNTXT_MENU_ADD:
-			if (type == FsItemType.File)
-				app.addToList("favorites", dname, fname, false);
-			else
-				app.addToList("favorites", fullName, app.DIR_TAG, false);
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				if (type == FsItemType.File) {
+					app.koreaderHistFav.addBookToFavorites(fullName);
+					app.readKoreaderFavorites();
+				}
+			} else {
+				if (type == FsItemType.File)
+					app.addToList("favorites", dname, fname, false);
+				else
+					app.addToList("favorites", fullName, app.DIR_TAG, false);
+			}
 			break;
 		case CNTXT_MENU_MARK_READING:
-			app.history.put(fullName, app.READING);
-			app.saveList("history");
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.setBookReading(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.history.put(fullName, app.READING);
+				app.saveList("history");
+			}
 			redrawList();
 			break;
 		case CNTXT_MENU_MARK_FINISHED:
-			app.history.put(fullName, app.FINISHED);
-			app.saveList("history");
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.setBookFinished(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.history.put(fullName, app.FINISHED);
+				app.saveList("history");
+			}
 			redrawList();
 			break;
 		case CNTXT_MENU_MARK_FORGET:
-			app.history.remove(fullName);
-			app.saveList("history");
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.removeBookFromHistory(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.history.remove(fullName);
+				app.saveList("history");
+			}
 			redrawList();
 			break;
 		case CNTXT_MENU_OPENWITH: {
@@ -3460,9 +3493,10 @@ public class ReLaunch extends Activity {
 		if (app.dataBase == null)
 			app.dataBase = new BooksBase(this);
 		app.generalOnResume(TAG, this);
-		if (prefs.getBoolean("useKOReaderHistFav", false)) {
-			app.reloadKOReaderHistory();
-			app.reloadKOReaderFavorites();
+		if (prefs.getBoolean("useKOReaderHistFav", false)
+				&& app.koreaderHistFav != null) {
+			app.readKoreaderHistory();
+			app.readKoreaderFavorites();
 		}
 		refreshBottomInfo();
 		redrawList();

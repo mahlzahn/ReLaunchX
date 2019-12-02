@@ -1221,22 +1221,46 @@ public class ResultsActivity extends Activity {
 
 		switch (item.getItemId()) {
 		case CNTXT_MENU_MARK_READING:
-			app.history.put(fullName, app.READING);
-			app.saveList("history");
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.setBookReading(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.history.put(fullName, app.READING);
+				app.saveList("history");
+			}
 			redrawList();
 			break;
 		case CNTXT_MENU_MARK_FINISHED:
-			app.history.put(fullName, app.FINISHED);
-			app.saveList("history");
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.setBookFinished(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.history.put(fullName, app.FINISHED);
+				app.saveList("history");
+			}
 			redrawList();
 			break;
 		case CNTXT_MENU_MARK_FORGET:
-			app.history.remove(fullName);
-			app.saveList("history");
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.removeBookFromHistory(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.history.remove(fullName);
+				app.saveList("history");
+			}
 			redrawList();
 			break;
 		case CNTXT_MENU_REMOVE_HISTORY:
-			app.removeFromList("lastOpened", fullName);
+			if (prefs.getBoolean("useKOReaderHistFav", false)
+					&& app.koreaderHistFav != null) {
+				app.koreaderHistFav.removeBookFromHistory(fullName);
+				app.readKoreaderHistory();
+			} else {
+				app.removeFromList("lastOpened", fullName);
+			}
 			itemsArray.remove(pos);
 			redrawList();
 			break;
@@ -1245,8 +1269,14 @@ public class ResultsActivity extends Activity {
 				app.removeFromList("favorites", fullName, app.DIR_TAG);
 				app.saveList("favorites");
 			} else {
-				app.removeFromList("favorites", dname, fname);
-				app.saveList("favorites");
+				if (prefs.getBoolean("useKOReaderHistFav", false)
+						&& app.koreaderHistFav != null) {
+					app.koreaderHistFav.removeBookFromFavorites(fullName);
+					app.readKoreaderFavorites();
+				} else {
+					app.removeFromList("favorites", dname, fname);
+					app.saveList("favorites");
+				}
 			}
 			itemsArray.remove(pos);
 			redrawList();
@@ -1425,9 +1455,10 @@ public class ResultsActivity extends Activity {
 		setEinkController();
 		super.onResume();
 		app.generalOnResume(TAG, this);
-		if (prefs.getBoolean("useKOReaderHistFav", false)) {
-			app.reloadKOReaderHistory();
-			app.reloadKOReaderFavorites();
+		if (prefs.getBoolean("useKOReaderHistFav", false)
+				&& app.koreaderHistFav != null) {
+			app.readKoreaderHistory();
+			app.readKoreaderFavorites();
 		}
 	}
 
